@@ -1,0 +1,12 @@
+/target/
+**/target/
+
+/db_data/
+
+*.swp
+.DS_Store
+.vscode/
+.idea/
+
+*.log
+.env

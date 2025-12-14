@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>МАИ FAQ — Админка</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: #f0f4f8;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 800px;
+            width: 100%;
+            background: white;
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            color: #007bff;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        section {
+            margin-bottom: 30px;
+        }
+
+        label {
+            display: block;
+            margin-top: 15px;
+            font-weight: bold;
+        }
+
+        textarea,
+        input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            margin-top: 5px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 1em;
+            box-sizing: border-box;
+        }
+
+        textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+
+        button {
+            margin-top: 15px;
+            padding: 10px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: background 0.2s;
+        }
+
+        .btn-add {
+            background-color: #28a745;
+            color: white;
+        }
+
+        .btn-add:hover {
+            background-color: #218838;
+        }
+
+        .btn-delete {
+            background-color: #dc3545;
+            color: white;
+            padding: 6px 10px;
+            font-size: 0.9em;
+        }
+
+        .btn-delete:hover {
+            background-color: #c82333;
+        }
+
+        .btn-toggle {
+            background-color: #ffc107;
+            color: #212529;
+            padding: 6px 10px;
+            font-size: 0.9em;
+            margin-left: 8px;
+        }
+
+        .btn-toggle:hover {
+            background-color: #e0a800;
+        }
+
+        .status {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 4px;
+        }
+
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+
+        .faq-list {
+            margin-top: 15px;
+        }
+
+        .faq-item {
+            padding: 12px;
+            border: 1px solid #eee;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            background-color: #fafafa;
+        }
+
+        .faq-question {
+            font-weight: bold;
+            margin-bottom: 6px;
+        }
+
+        .faq-answer {
+            color: #555;
+            margin-bottom: 8px;
+        }
+
+        .faq-meta {
+            font-size: 0.85em;
+            color: #777;
+        }
+
+        .inactive {
+            opacity: 0.6;
+            background-color: #f9f9f9;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>Админка — Управление FAQ</h1>
+
+        <section>
+            <h2>Добавить новый вопрос</h2>
+            <form id="addQuestionForm">
+                <label for="newQuestion">Вопрос:</label>
+                <input type="text" id="newQuestion" required>
+
+                <label for="newKeywords">Ключевые слова:</label>
+                <input type="text" id="newKeywords" required>
+
+                <label for="newAnswer">Ответ:</label>
+                <textarea id="newAnswer" required></textarea>
+
+                <button type="submit" class="btn-add">Добавить в базу</button>
+            </form>
+            <div id="statusMessage"></div>
+        </section>
+
+        <section>
+            <h2>Существующие вопросы</h2>
+            <div id="faqList" class="faq-list">
+                <p>Загрузка...</p>
+            </div>
+            <button id="refreshBtn">Обновить список</button>
+        </section>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8080/api/admin';
+        const ADMIN_TOKEN = 'ADMIN_TOKEN';
+
+        function showStatus(text, type) {
+            const statusDiv = document.getElementById('statusMessage');
+            statusDiv.textContent = text;
+            statusDiv.className = `status ${type}`;
+            setTimeout(() => {
+                statusDiv.textContent = '';
+                statusDiv.className = '';
+            }, 5000);
+        }
+
+        async function apiFetch(url, options = {}) {
+            const defaultHeaders = {
+                'Content-Type': 'application/json',
+                'X-Admin-Token': ADMIN_TOKEN
+            };
+            const config = {
+                ...options,
+                headers: {...defaultHeaders, ...options.headers}
+            };
+            try {
+                const res = await fetch(url, config);
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({}));
+                    throw new Error(err.error || `HTTP ${res.status}`);
+                }
+                return await res.json();
+            } catch (err) {
+                console.error('API error:', err);
+                throw err;
+            }
+        }
+
+        document.getElementById('addQuestionForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const question = document.getElementById('newQuestion').value.trim();
+            const keywords = document.getElementById('newKeywords').value.trim(); // ← исправлено!
+            const answer = document.getElementById('newAnswer').value.trim();
+
+            if (!question || !answer) {
+                showStatus('Поля не должны быть пустыми.', 'error');
+                return;
+            }
+
+            try {
+                await apiFetch(`${API_BASE}/faq`, {
+                    method: 'POST',
+                    body: JSON.stringify({question, keywords, answer})
+                });
+                showStatus('Вопрос успешно добавлен!', 'success');
+                document.getElementById('addQuestionForm').reset();
+                loadFaqList();
+            } catch (err) {
+                showStatus(`Ошибка: ${err.message}`, 'error');
+            }
+        });
+
+        async function deleteFaq(id) {
+            if (!confirm('Удалить этот вопрос? Это действие нельзя отменить.')) return;
+
+            try {
+                await apiFetch(`${API_BASE}/faq/${id}`, {method: 'DELETE'});
+                showStatus('Вопрос удалён.', 'success');
+                loadFaqList();
+            } catch (err) {
+                showStatus(`Ошибка удаления: ${err.message}`, 'error');
+            }
+        }
+
+        async function toggleActive(id) {
+            try {
+                await apiFetch(`${API_BASE}/faq/${id}/toggle-active`, {method: 'PATCH'});
+                showStatus('Статус обновлён.', 'success');
+                loadFaqList();
+            } catch (err) {
+                showStatus(`Ошибка обновления: ${err.message}`, 'error');
+            }
+        }
+
+        async function loadFaqList() {
+            const listDiv = document.getElementById('faqList');
+            try {
+                const data = await apiFetch(`${API_BASE}/faq`);
+                if (!data.data || data.data.length === 0) {
+                    listDiv.innerHTML = '<p>В базе пока нет вопросов.</p>';
+                    return;
+                }
+
+                listDiv.innerHTML = data.data.map(item => `
+                <div class="faq-item ${!item.is_active ? 'inactive' : ''}">
+                    <div class="faq-question">${escapeHtml(item.question)}</div>
+                    <div class="faq-answer">${escapeHtml(item.answer)}</div>
+                    <div class="faq-meta">
+                        ID: ${item.id} • 
+                        Ключевые слова: <em>${escapeHtml(item.keywords || '—')}</em> •
+                        ${item.is_active ? 'Активен' : 'Неактивен'} •
+                        Создан: ${item.created_at ? new Date(item.created_at).toLocaleString('ru-RU') : '—'}
+                    </div>
+                    <button class="btn-toggle" onclick="toggleActive(${item.id})">
+                        ${item.is_active ? 'Сделать неактивным' : 'Сделать активным'}
+                    </button>
+                    <button class="btn-delete" onclick="deleteFaq(${item.id})">Удалить</button>
+                </div>
+            `).join('');
+            } catch (err) {
+                listDiv.innerHTML = `<p class="error">Ошибка загрузки: ${err.message}</p>`;
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        document.getElementById('refreshBtn').addEventListener('click', loadFaqList);
+        loadFaqList();
+    </script>
+</body>
+
+</html>

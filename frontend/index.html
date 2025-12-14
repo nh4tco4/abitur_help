@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>МАИ FAQ - Вопросы абитуриентов</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: #f0f4f8;
+            color: #333;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        header {
+            background-color: #007bff;
+            color: white;
+            width: 100%;
+            padding: 20px 0;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 2.5em;
+        }
+
+        header p {
+            margin: 5px 0 0;
+            font-size: 1.2em;
+        }
+
+        main {
+            max-width: 800px;
+            width: 100%;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            margin: 20px 0;
+        }
+
+        form {
+            display: flex;
+            margin-bottom: 20px;
+        }
+
+        input[type="text"] {
+            flex: 1;
+            padding: 12px;
+            border: 1px solid #ccc;
+            border-radius: 4px 0 0 4px;
+            font-size: 1em;
+        }
+
+        button {
+            padding: 12px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 0 4px 4px 0;
+            cursor: pointer;
+            font-size: 1em;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        #results {
+            margin-top: 20px;
+        }
+
+        #results h2 {
+            color: #007bff;
+            margin-bottom: 10px;
+        }
+
+        #results p {
+            line-height: 1.6;
+        }
+
+        #results h3 {
+            margin-top: 20px;
+            color: #333;
+        }
+
+        #results ul {
+            list-style-type: disc;
+            padding-left: 20px;
+        }
+
+        #results li {
+            margin-bottom: 5px;
+            cursor: pointer;
+            color: #007bff;
+            text-decoration: underline;
+        }
+
+        #results li:hover {
+            color: #0056b3;
+        }
+
+        .not-found {
+            color: #dc3545;
+        }
+
+        footer {
+            margin-top: auto;
+            padding: 10px 0;
+            text-align: center;
+            color: #666;
+            font-size: 0.9em;
+            width: 100%;
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <h1>МАИ FAQ</h1>
+        <p>Ответы на часто задаваемые вопросы абитуриентов Московского авиационного института</p>
+    </header>
+    <main>
+        <form id="searchForm">
+            <input type="text" id="query" placeholder="Введите ваш вопрос..." required>
+            <button type="submit">Поиск</button>
+        </form>
+        <div id="results"></div>
+    </main>
+    <footer>
+        © 2025 МАИ FAQ. Все права защищены.
+    </footer>
+    <script>
+        const searchForm = document.getElementById('searchForm');
+        const queryInput = document.getElementById('query');
+        const resultsDiv = document.getElementById('results');
+
+        async function performSearch(query) {
+            if (!query) return;
+
+            try {
+                const response = await fetch('http://localhost:8080/api/search', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({query})
+                });
+
+                if (!response.ok) {
+                    throw new Error('Ошибка сети');
+                }
+
+                const data = await response.json();
+                resultsDiv.innerHTML = '';
+
+                if (data.status === 'found') {
+                    resultsDiv.innerHTML += `<h2>${data.question}</h2><p>${data.answer}</p>`;
+                    if (data.similar_questions && data.similar_questions.length > 0) {
+                        resultsDiv.innerHTML += '<h3>Похожие вопросы:</h3><ul>';
+                        data.similar_questions.forEach(q => {
+                            resultsDiv.innerHTML += `<li onclick="handleSimilarClick('${q.replace(/'/g, "\\'")}')">${q}</li>`;
+                        });
+                        resultsDiv.innerHTML += '</ul>';
+                    }
+                } else {
+                    resultsDiv.innerHTML += '<p class="not-found">Нет совпадений. Вот несколько предложений:</p><ul>';
+                    if (data.suggestions && data.suggestions.length > 0) {
+                        data.suggestions.forEach(s => {
+                            resultsDiv.innerHTML += `<li onclick="handleSimilarClick('${s.replace(/'/g, "\\'")}')">${s}</li>`;
+                        });
+                    }
+                    resultsDiv.innerHTML += '</ul>';
+                }
+            } catch (error) {
+                resultsDiv.innerHTML = '<p class="not-found">Произошла ошибка при поиске. Пожалуйста, попробуйте позже.</p>';
+            }
+        }
+
+        function handleSimilarClick(question) {
+            queryInput.value = question;
+            performSearch(question);
+        }
+
+        searchForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const query = queryInput.value.trim();
+            performSearch(query);
+        });
+    </script>
+</body>
+
+</html>

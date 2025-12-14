@@ -1,0 +1,45 @@
+services:
+  db:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_DATABASE: faq_db
+      MYSQL_USER: faq_user
+      MYSQL_PASSWORD: faq_pass
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      retries: 20
+
+  backend:
+    build: ./backend
+    ports:
+      - "8080:8080"
+    environment:
+      - DATABASE_URL=mysql://faq_user:faq_pass@db:3306/faq_db
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  telegram_bot:
+      build: ./telegram_bot
+      restart: unless-stopped
+      depends_on:
+        - backend
+      environment:
+        - BACKEND_URL=http://backend:8080/api/search
